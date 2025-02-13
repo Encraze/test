@@ -45,7 +45,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           PR_TITLE="${{ github.event.pull_request.title }}"
-          PATTERN="^(feat|feature|refactor|fix|chore|build|docs|test): .+$"
+          PATTERN="^(feat|feature|refactor|fix|chore|docs|test): .+$"
 
           if ! [[ $PR_TITLE =~ $PATTERN ]]; then
             echo "Error: PR title '$PR_TITLE' does not follow the required format"
