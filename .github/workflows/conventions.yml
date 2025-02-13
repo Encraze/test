@@ -25,7 +25,7 @@ jobs:
             exit 0
           fi
 
-          PATTERN="^((feat|feature|refactor|fix|chore|docs|test)/[0-9]+/[a-zA-Z0-9-_]+)$"
+          PATTERN="^(feat|feature|refactor|fix|chore|docs|test)/[0-9]+/[a-zA-Z0-9-]+$"
 
           if ! [[ $BRANCH_NAME =~ $PATTERN ]]; then
             echo "Error: Branch name '$BRANCH_NAME' does not follow the required convention"
@@ -45,7 +45,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           PR_TITLE="${{ github.event.pull_request.title }}"
-          PATTERN="^(feat|feature|refactor|fix|chore|chore\(deps\)|chore\(deps-dev\)|build\(deps\)|docs|test): .+$"
+          PATTERN="^(feat|feature|refactor|fix|chore|docs|test): .+$"
 
           if ! [[ $PR_TITLE =~ $PATTERN ]]; then
             echo "Error: PR title '$PR_TITLE' does not follow the required format"
