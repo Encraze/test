@@ -1,0 +1,77 @@
+name: "Install Backend"
+description: "Setup Python, install poetry (if necessary), setup cache for project venv, and run poetry install (if necessary)."
+
+inputs:
+  cache-key-suffix:
+    description: "Cache key suffix to append to cache key"
+    required: false
+  install-poetry:
+    description: "Install poetry after the Python or not?"
+    required: false
+    default: "true"
+  poetry-command:
+    description: "Poetry command to run"
+    required: false
+    default: "poetry"
+  poetry-install-args:
+    description: "Pass given args to poetry install"
+    required: false
+  poetry-version:
+    description: "Poetry version to use (if needed)"
+    required: false
+    default: "1.8.3"
+  python-version:
+    description: "Python version to use instead of one, defined in python version file"
+    required: false
+  run-poetry-install:
+    description: "Run poetry install or not?"
+    required: false
+    default: "true"
+
+outputs:
+  python-path:
+    description: "Absolute path to Python executable"
+    value: "${{ steps.python.outputs.python-path }}"
+  python-version:
+    description: "Installed Python version"
+    value: "${{ steps.python.outputs.python-version }}"
+  poetry-version:
+    description: "Installed poetry version"
+    value: "${{ inputs.poetry-version }}"
+
+runs:
+  using: "composite"
+  steps:
+    - id: "python-version-file"
+      shell: "bash"
+      run: |
+        set -euo pipefail
+
+        python_version_file=
+        if [ -z "${{ inputs.python-version }}" ]; then
+          python_version_file=".python-version"
+        fi
+
+        echo "value=${python_version_file}" >> "${GITHUB_OUTPUT}"
+
+    - id: "python"
+      uses: "actions/setup-python@v5.2.0"
+      with:
+        python-version: "${{ inputs.python-version }}"
+        python-version-file: "${{ steps.python-version-file.outputs.value }}"
+
+    - name: "Install poetry"
+      if: "${{ inputs.install-poetry == 'true' }}"
+      shell: "bash"
+      run: "pipx install --python='${{ steps.python.outputs.python-path }}' poetry==${{ inputs.poetry-version }}"
+
+    - name: "Cache venv"
+      uses: "actions/cache@v4.2.0"
+      with:
+        path: ".venv/"
+        key: "venv-${{ steps.python.outputs.python-version }}-${{ hashFiles('poetry.lock') }}${{ inputs.cache-key-suffix }}"
+
+    - name: "Install project"
+      if: "${{ inputs.run-poetry-install == 'true' }}"
+      shell: "bash"
+      run: "${{ inputs.poetry-command }} install ${{ inputs.poetry-install-args }}"

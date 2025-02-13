@@ -1,0 +1,47 @@
+defaults:
+  run:
+    shell: "bash"
+
+name: "Run Cypress Tests"
+
+on:
+  workflow_call:
+    inputs:
+      continue-on-error:
+        description: "Do not fail workflow on tests failure"
+        type: "boolean"
+        required: false
+        default: false
+
+    secrets:
+      twilio-account-sid:
+        description: "Twilio Account SID to run tests with"
+        required: true
+
+  workflow_dispatch:
+
+jobs:
+  run-cypress:
+    runs-on: "ubuntu-22.04"
+
+    steps:
+      - uses: "actions/checkout@v4.1.7"
+
+      - name: "Setup continue on error"
+        id: "setup-continue-on-error"
+        run: |
+          set -euo pipefail
+
+          continue_on_error="${{ inputs.continue-on-error }}"
+          if [ -z "${continue_on_error}" ]; then
+            continue_on_error="false"
+          fi
+
+          echo "continue-on-error=${continue_on_error}" >> "${GITHUB_OUTPUT}"
+
+      - name: "Run Cypress Tests"
+        uses: "cypress-io/github-action@v6.7.5"
+        continue-on-error: ${{ steps.setup-continue-on-error.outputs.continue-on-error == 'true' }}
+        with:
+          env: "TWILIO_ACCOUNT_SID=${{ secrets.twilio-account-sid }}"
+          project: "./tests"

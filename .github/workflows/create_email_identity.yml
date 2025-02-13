@@ -1,0 +1,75 @@
+defaults:
+  run:
+    shell: "bash"
+
+name: "Create Email Identity"
+run-name: "Create Email Identity: ${{ inputs.email }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: "Email address"
+        required: true
+        type: "string"
+
+      region:
+        description: "AWS Region"
+        required: true
+        type: "string"
+        default: "us-east-1"
+
+env:
+  BOTO3_VERSION: "1.34.158"
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  create_email_identity:
+    name: "Create Email Identity: ${{ inputs.email }}"
+
+    runs-on: "ubuntu-22.04"
+
+    steps:
+      - uses: "actions/checkout@v4.1.7"
+
+      - id: "python"
+        uses: "actions/setup-python@v5.2.0"
+        with:
+          python-version-file: ".python-version"
+
+      - name: "Install boto3"
+        run: "python3 -m pip install boto3==${{ env.BOTO3_VERSION }}"
+
+      - name: "Setup AWS region"
+        run: |
+          set -euo pipefail
+
+          echo "AWS_DEFAULT_REGION=${{ inputs.region }}" >> "${GITHUB_ENV}"
+
+      - name: "Configure AWS credentials"
+        uses: "aws-actions/configure-aws-credentials@v4.0.2"
+        with:
+          aws-access-key-id: "${{ secrets.CDK_AWS_ACCESS_KEY_ID }}"
+          aws-secret-access-key: "${{ secrets.CDK_AWS_SECRET_ACCESS_KEY }}"
+          aws-region: "${{ env.AWS_DEFAULT_REGION }}"
+          role-to-assume: "${{ secrets.CDK_AWS_ROLE_TO_ASSUME }}"
+          role-session-name: "boto3-from-ci-for-${{ github.sha }}"
+          role-duration-seconds: 3600
+          role-skip-session-tagging: true
+
+      - name: "Create Email Identity"
+        shell: "python"
+        run: |
+          import boto3
+
+          sesv2 = boto3.client("sesv2")
+
+          email_identity = "${{ inputs.email }}"
+
+          print(f"Creating Email Identity: {email_identity}")
+          print(
+            sesv2.create_email_identity(
+              EmailIdentity=email_identity,
+              Tags=[{"Key": "CDK", "Value": "false"}],
+            )
+          )

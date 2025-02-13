@@ -1,0 +1,26 @@
+name: "Prepare survey bundle for CDK deploy"
+description: ""
+
+inputs:
+  stack-name:
+    description: "Stack name for survey build"
+    required: true
+
+runs:
+  using: "composite"
+
+  steps:
+    - name: "Fake survey application"
+      if: "${{ !startsWith(inputs.stack-name, 'survey') }}"
+      shell: "bash"
+      run: "mkdir survey/build/"
+
+    - name: "Install survey application"
+      if: "${{ startsWith(inputs.stack-name, 'survey') }}"
+      uses: "./.github/actions/install_frontend/"
+      with:
+        working-directory: "survey/"
+
+    - name: "Build survey application"
+      if: "${{ startsWith(inputs.stack-name, 'survey') }}"
+      uses: "./.github/actions/build_survey/"

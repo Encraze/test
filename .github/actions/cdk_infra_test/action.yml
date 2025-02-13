@@ -1,0 +1,77 @@
+name: "Run Functional Tests"
+description: "Executes functional tests for the backend, ensuring proper functionality before deployment."
+
+inputs:
+  stack_name:
+    description: "Name of the stack to test."
+    required: true
+    type: "string"
+
+  skip_tests:
+    description: "Skip test execution and proceed directly to deployment."
+    required: false
+    default: false
+    type: "boolean"
+
+  always_skip:
+    description: "Comma-separated list of stacks to skip testing for."
+    default: "aretihealth,aretihealth-staging,aretihealth-core,survey,survey-staging"
+    required: true
+    type: "string"
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Cache mypy"
+      # if: "!inputs.skip_tests && !echo '${{ inputs.always_skip }}' | tr ',' '\n' | grep -q '${{ inputs.stack_name }}'"
+      if: "!inputs.skip_tests && !contains(inputs.always_skip, inputs.stack_name)"
+      uses: "actions/cache@v4.2.0"
+      with:
+        path: ".mypy_cache/"
+        key: "mypy-${{ runner.os }}-${{ inputs.stack_name }}"
+
+    - name: "Run Pre-commit Checks"
+      # if: "!inputs.skip_tests && !echo '${{ inputs.always_skip }}' | tr ',' '\n' | grep -q '${{ inputs.stack_name }}'"
+      if: "!inputs.skip_tests && !contains(inputs.always_skip, inputs.stack_name)"
+      uses: "pre-commit/action@v3.0.1"
+      env:
+        # TODO: Do not skip requirements check        
+        SKIP: "ensure-requirements"
+        
+    - name: "Setup .env for Local Tests"      
+      uses: "./.github/actions/make_dotenv_local/"        
+      with:
+        aws-access-key-id: "${{ env.CI_AWS_ACCESS_KEY_ID }}"
+        aws-secret-access-key: "${{ env.CI_AWS_SECRET_ACCESS_KEY }}"
+
+    - name: "Verify API Gateway Lambda Handler Importable"
+      # if: "!inputs.skip_tests && !echo '${{ inputs.always_skip }}' | tr ',' '\n' | grep -q '${{ inputs.stack_name }}'"
+      if: "!inputs.skip_tests && !contains(inputs.always_skip, inputs.stack_name)"
+      run: |
+        set -euo pipefail      
+        ./dotenv.sh poetry run python3 \
+        -c "from neurality_app import lambda_app; print(lambda_app.handler)"
+      shell: bash
+
+    - name: "Verify Lambda Function URL Handler Importable"
+      # if: "!inputs.skip_tests && !echo '${{ inputs.always_skip }}' | tr ',' '\n' | grep -q '${{ inputs.stack_name }}'"
+      if: "!inputs.skip_tests && !contains(inputs.always_skip, inputs.stack_name)"
+      run: |
+        set -euo pipefail      
+        ./dotenv.sh poetry run python3 \
+        -c "from demo_api import lambda_app; print(lambda_app.handler)"
+      shell: bash
+
+    - name: "Run Functional Tests"
+      # if: "!inputs.skip_tests && !echo '${{ inputs.always_skip }}' | tr ',' '\n' | grep -q '${{ inputs.stack_name }}'"
+      if: "!inputs.skip_tests && !contains(inputs.always_skip, inputs.stack_name)"
+      run: |
+        set -euo pipefail        
+        ./dotenv.sh poetry run python3 -m pytest backend/tests/functional
+      shell: bash
+      env:
+        STAGE: "test"
+        AWS_ACCESS_KEY_ID: "${{ env.CI_AWS_ACCESS_KEY_ID }}"
+        AWS_SECRET_ACCESS_KEY: "${{ env.CI_AWS_SECRET_ACCESS_KEY }}"
+        AWS_DEFAULT_REGION: "us-east-1"        
+

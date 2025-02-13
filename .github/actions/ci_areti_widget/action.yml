@@ -1,0 +1,23 @@
+name: "CI Areti Widget"
+description: "Run CI steps for Areti Widget."
+
+runs:
+  using: "composite"
+  steps:    
+    - name: "Install frontend (areti-widget/)"
+      uses: "./.github/actions/install_frontend/"      
+      with:
+        installer: "npx yarn"
+        working-directory: "areti-widget/"              
+
+    - name: "Copy sample .env file"
+      run: "cp -v .env.sample .env"
+      working-directory: "areti-widget/"
+      shell: bash                              
+
+    - uses: "./.github/actions/build_frontend/"
+      with:
+        builder: "npx yarn"
+        working-directory: "areti-widget/"
+      env:
+        CI: "false"

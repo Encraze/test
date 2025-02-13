@@ -1,0 +1,73 @@
+name: "Setup CDK"
+description: "Install & setup CDK, so it can be used for diff / deploy afterwards"
+
+inputs:
+  cdk-aws-access-key-id:
+    description: "AWS_ACCESS_KEY_ID for CDK needs"
+    required: true
+  cdk-aws-region:
+    description: "AWS region for CDK needs"
+    required: true
+  cdk-aws-secret-access-key:
+    description: "AWS_SECRET_ACCESS_KEY for CDK needs"
+    required: true
+  cdk-role-duration-seconds:
+    description: "Duration of assumed role in seconds"
+    required: false
+    default: "3600"
+  cdk-role-to-assume:
+    description: "Role to assume for CDK needs"
+    required: true
+  cdk-version:
+    description: "aws-cdk version to use"
+    required: false
+    default: "2.177.0"
+  ecr-aws-access-key-id:
+    description: "AWS_ACCESS_KEY_ID for login to public ECR"
+    required: true
+  ecr-aws-region:
+    description: "AWS region of public ECR"
+    required: true
+  ecr-aws-secret-access-key:
+    description: "AWS_SECRET_ACCESS_KEY for login to public ECR"
+    required: true
+
+outputs:
+  python-path:
+    description: "Full path to installed Python"
+    value: "${{ steps.install-backend.outputs.python-path }}"
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Install node.js"
+      uses: "actions/setup-node@v4.0.3"
+      with:
+        node-version-file: ".node-version"
+
+    - name: "Install AWS CDK cli"
+      shell: "bash"
+      run: "npm install -g aws-cdk@${{ inputs.cdk-version }}"
+
+    - id: "install-backend"
+      uses: "./.github/actions/install_backend/"
+      with:
+        cache-key-suffix: "-infrastructure"
+        poetry-install-args: "--only infrastructure"
+
+    - uses: "./.github/actions/setup_ecr/"
+      with:
+        aws-access-key-id: "${{ inputs.ecr-aws-access-key-id }}"
+        aws-secret-access-key: "${{ inputs.ecr-aws-secret-access-key }}"
+        aws-region: "${{ inputs.ecr-aws-region }}"
+
+    - name: "Configure AWS credentials for CDK"
+      uses: "aws-actions/configure-aws-credentials@v4.0.2"
+      with:
+        aws-access-key-id: "${{ inputs.cdk-aws-access-key-id }}"
+        aws-secret-access-key: "${{ inputs.cdk-aws-secret-access-key }}"
+        aws-region: "${{ inputs.cdk-aws-region }}"
+        role-to-assume: "${{ inputs.cdk-role-to-assume }}"
+        role-session-name: "cdk-from-ci-for-${{ github.sha }}"
+        role-duration-seconds: "${{ inputs.cdk-role-duration-seconds }}"
+        role-skip-session-tagging: true

@@ -1,0 +1,340 @@
+defaults:
+  run:
+    shell: "bash"
+
+name: "Deploy Flex Admin plugin"
+run-name: "Deploy Flex Admin plugin: ${{ inputs.twilio_account }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      twilio_account:
+        description: "Twilio Account to deploy"
+        required: true
+        type: "choice"
+        options:
+          # Staging
+          - "ParatusStaging (neurality-paratus-staging)"
+          - "SpauldingStage (neurality-spaulding-staging)"
+          - "TektonStaging (neurality-tekton-staging)"
+          - "HeliosStaging (neurality-helios-staging)"
+          - "AlcanzaStaging (neurality-alcanza-staging)"
+          - "AlsaStaging (neurality-alsa-staging)"
+          # Demo
+          - "Aichat (neurality-paradigm-demo)"
+          - "Klarity (neurality-demo)"
+          # Prod
+          - "Paratus (neurality-paratus-prod)"
+          - "Spaulding (neurality-spaulding-prod)"
+          - "Tekton (neurality-tekton-prod)"
+          - "Areti (neurality-areti-prod)"
+          - "Helios (neurality-helios-prod)"
+          - "Alcanza (neurality-alcanza-prod)"
+          - "Alsa (neurality-alsa-prod)"
+          # DO NOT REMOVE: accounts added by Infrastructure Automation scripts
+          - "ClinicalEnrollment (neurality-clinical-enrollment-prod)"
+          - "ClinicalEnrollmentStaging (neurality-clinical-enrollment-staging)"
+          - "Flourish (neurality-flourish-prod)"
+          - "FlourishStaging (neurality-flourish-staging)"
+          - "Seattle (neurality-seattle-prod)"
+          - "SeattleStaging (neurality-seattle-staging)"
+          - "Catalina (neurality-catalina-prod)"
+          - "CatalinaStaging (neurality-catalina-staging)"
+          - "Elite (neurality-elite-prod)"
+          - "EliteStaging (neurality-elite-staging)"
+          - "Chesapeake (neurality-chesapeake-prod)"
+          - "ChesapeakeStaging (neurality-chesapeake-staging)"
+          - "Gadolin (neurality-gadolin-prod)"
+          - "GadolinStaging (neurality-gadolin-staging)"
+          - "QCR (neurality-qcr-prod)"
+          - "QCRstaging (neurality-qcr-staging)"
+          - "IMA (neurality-ima-prod)"
+          - "IMAstaging (neurality-ima-staging)"
+          - "ParadigmV2 (neurality-paradigm-v2-prod)"
+          - "ParadigmV2Staging (neurality-paradigm-v2-staging)"
+
+      release_type:
+        description: "Release type"
+        required: true
+        type: "choice"
+        options:
+          - "patch"
+          - "minor"
+          - "major"
+        default: "minor"
+
+# Do not run multiple Flex Admin deploys in parallel
+concurrency:
+  group: "${{ github.workflow }}-${{ inputs.twilio_account }}"
+  cancel-in-progress: true
+
+env:
+  FLEX_ADMIN_DIR: "twilio/admin/"
+
+jobs:
+  flex_admin_deploy:
+    name: "Deploy Flex Admin plugin: ${{ inputs.twilio_account }}"
+
+    runs-on: "ubuntu-22.04"
+
+    steps:
+      - uses: "actions/checkout@v4.1.7"
+
+      - uses: "./.github/actions/install_frontend/"
+        with:
+          install-args: "--legacy-peer-deps"
+          install-twilio-cli: "true"
+          install-twilio-flex-plugin: "true"
+          working-directory: "${{ env.FLEX_ADMIN_DIR }}"
+
+      - name: "Configure Twilio credentials"
+        run: |
+          set -euo pipefail
+
+          twilio_secret_infix=""
+          case "${{ inputs.twilio_account }}" in
+            "ParatusStaging (neurality-paratus-staging)")
+              echo "Setup to use neurality-paratus-staging Twilio credentials"
+              twilio_secret_infix="PARATUS_STAGING"
+              ;;
+
+            "SpauldingStage (neurality-spaulding-staging)")
+              echo "Setup to use neurality-spaulding-staging Twilio credentials"
+              twilio_secret_infix="SPAULDING_STAGING"
+              ;;
+
+            "TektonStaging (neurality-tekton-staging)")
+              echo "Setup to use neurality-tekton-staging Twilio credentials"
+              twilio_secret_infix="TEKTON_STAGING"
+              ;;
+
+            "AlcanzaStaging (neurality-alcanza-staging)")
+              echo "Setup to use neurality-alcanza-staging Twilio credentials"
+              twilio_secret_infix="ALCANZA_STAGING"
+              ;;
+
+            "HeliosStaging (neurality-helios-staging)")
+              echo "Setup to use neurality-helios-staging Twilio credentials"
+              twilio_secret_infix="HELIOS_STAGING"
+              ;;
+
+            "AlsaStaging (neurality-alsa-staging)")
+              echo "Setup to use neurality-alsa-staging Twilio credentials"
+              twilio_secret_infix="ALSA_STAGING"
+              ;;
+
+            "Aichat (neurality-paradigm-demo)")
+              echo "Setup to use neurality-paradigm-demo Twilio credentials"
+              twilio_secret_infix="PARADIGM_DEMO"
+              ;;
+
+            "Klarity (neurality-demo)")
+              echo "Setup to use neurality-demo Twilio credentials"
+              twilio_secret_infix="DEMO"
+              ;;
+
+            "Tekton (neurality-tekton-prod)")
+              echo "Setup to use neurality-tekton-prod Twilio credentials"
+              twilio_secret_infix="TEKTON_PROD"
+              ;;
+
+            "Helios (neurality-helios-prod)")
+              echo "Setup to use neurality-helios-prod Twilio credentials"
+              twilio_secret_infix="HELIOS_PROD"
+              ;;
+
+            "Alcanza (neurality-alcanza-prod)")
+              echo "Setup to use neurality-alcanza-prod Twilio credentials"
+              twilio_secret_infix="ALCANZA_PROD"
+              ;;
+
+            "Alsa (neurality-alsa-prod)")
+              echo "Setup to use neurality-alsa-prod Twilio credentials"
+              twilio_secret_infix="ALSA_PROD"
+              ;;
+
+            "Paratus (neurality-paratus-prod)")
+              echo "Setup to use neurality-paratus-prod Twilio credentials"
+              twilio_secret_infix="PARATUS_PROD"
+              ;;
+
+            "Spaulding (neurality-spaulding-prod)")
+              echo "Setup to use neurality-spaulding-prod Twilio credentials"
+              twilio_secret_infix="SPAULDING_PROD"
+              ;;
+
+            "Areti (neurality-areti-prod)")
+              echo "Setup to use neurality-areti-prod Twilio credentials"
+              twilio_secret_infix="ARETI_PROD"
+              ;;
+
+            # DO NOT REMOVE: infixes added by Infrastructure Automation scripts
+            "ClinicalEnrollment (neurality-clinical-enrollment-prod)")
+              echo "Setup to use neurality-clinical-enrollment-prod Twilio credentials"
+              twilio_secret_infix="CLINICAL_ENROLLMENT_PROD"
+              ;;
+
+            "ClinicalEnrollmentStaging (neurality-clinical-enrollment-staging)")
+              echo "Setup to use neurality-clinical-enrollment-staging Twilio credentials"
+              twilio_secret_infix=""
+              ;;          
+            "Flourish (neurality-flourish-prod)")
+              echo "Setup to use neurality-flourish-prod Twilio credentials"\n                        
+              twilio_secret_infix=""\n
+              ;;
+            "FlourishStaging (neurality-flourish-staging)")
+              echo "Setup to use neurality-flourish-staging Twilio credentials"
+              twilio_secret_infix="FLOURISH_STAGING"
+              ;;
+
+            "Seattle (neurality-seattle-prod)")
+              echo "Setup to use neurality-seattle-prod Twilio credentials"
+              twilio_secret_infix="SEATTLE_PROD"
+              ;;
+
+            "SeattleStaging (neurality-seattle-staging)")
+              echo "Setup to use neurality-seattle-staging Twilio credentials"
+              twilio_secret_infix="SEATTLE_STAGING"
+              ;;
+
+            "Catalina (neurality-catalina-prod)")
+              echo "Setup to use neurality-catalina-prod Twilio credentials"
+              twilio_secret_infix="CATALINA_PROD"
+              ;;
+
+            "CatalinaStaging (neurality-catalina-staging)")
+              echo "Setup to use neurality-catalina-staging Twilio credentials"
+              twilio_secret_infix="CATALINA_STAGING"
+              ;;
+
+            "Elite (neurality-elite-prod)")
+              echo "Setup to use neurality-elite-prod Twilio credentials"
+              twilio_secret_infix="ELITE_PROD"
+              ;;
+
+            "EliteStaging (neurality-elite-staging)")
+              echo "Setup to use neurality-elite-staging Twilio credentials"
+              twilio_secret_infix="ELITE_STAGING"
+              ;;
+
+            "Chesapeake (neurality-chesapeake-prod)")
+              echo "Setup to use neurality-chesapeake-prod Twilio credentials"
+              twilio_secret_infix="CHESAPEAKE_PROD"
+              ;;
+
+            "ChesapeakeStaging (neurality-chesapeake-staging)")
+              echo "Setup to use neurality-chesapeake-staging Twilio credentials"
+              twilio_secret_infix="CHESAPEAKE_STAGING"
+              ;;
+
+            "Gadolin (neurality-gadolin-prod)")
+              echo "Setup to use neurality-gadolin-prod Twilio credentials"
+              twilio_secret_infix="GADOLIN_PROD"
+              ;;
+
+            "GadolinStaging (neurality-gadolin-staging)")
+              echo "Setup to use neurality-gadolin-staging Twilio credentials"
+              twilio_secret_infix="GADOLIN_STAGING"
+              ;;
+
+            "QCR (neurality-qcr-prod)")
+              echo "Setup to use neurality-qcr-prod Twilio credentials"
+              twilio_secret_infix="QCR_PROD"
+              ;;
+
+            "QCRstaging (neurality-qcr-staging)")
+              echo "Setup to use neurality-qcr-staging Twilio credentials"
+              twilio_secret_infix="QCR_STAGING"
+              ;;
+
+            "IMA (neurality-ima-prod)")
+              echo "Setup to use neurality-ima-prod Twilio credentials"
+              twilio_secret_infix="IMA_PROD"
+              ;;
+
+            "IMAstaging (neurality-ima-staging)")
+              echo "Setup to use neurality-ima-staging Twilio credentials"
+              twilio_secret_infix="IMA_STAGING"
+              ;;
+
+            "ParadigmV2 (neurality-paradigm-v2-prod)")
+              echo "Setup to use neurality-paradigm-v2-prod Twilio credentials"
+              twilio_secret_infix="PARADIGM_V2_PROD"
+              ;;
+
+            "ParadigmV2Staging (neurality-paradigm-v2-staging)")
+              echo "Setup to use neurality-paradigm-v2-staging Twilio credentials"
+              twilio_secret_infix="PARADIGM_V2_STAGING"
+              ;;
+
+
+            *)
+              echo >&2 "ERROR: Unable to setup Twilio credentials for ${{ inputs.twilio_account }} account. Exit..."
+              exit 1
+              ;;
+          esac
+
+          echo "TWILIO_ACCOUNT_SID_SECRET_NAME=FLEX_ADMIN_${twilio_secret_infix}_TWILIO_ACCOUNT_SID" >> "${GITHUB_ENV}"
+          echo "TWILIO_AUTH_TOKEN_SECRET_NAME=FLEX_ADMIN_${twilio_secret_infix}_TWILIO_AUTH_TOKEN" >> "${GITHUB_ENV}"
+
+      - name: "Deploy Flex Admin plugin"
+        id: "deploy"
+        run: |
+          set -euo pipefail
+
+          deploy_date="$(date -Iseconds)"
+          deploy_output="$(twilio flex:plugins:deploy --${{ inputs.release_type }} --changelog "Deployed via GitHub Actions at ${deploy_date}")"
+
+          echo "deploy-output<<EOF" >> "${GITHUB_OUTPUT}"
+          echo "${deploy_output}" >> "${GITHUB_OUTPUT}"
+          echo "EOF" >> "${GITHUB_OUTPUT}"
+        working-directory: "${{ env.FLEX_ADMIN_DIR }}"
+        env:
+          TWILIO_ACCOUNT_SID: "${{ secrets[env.TWILIO_ACCOUNT_SID_SECRET_NAME] }}"
+          TWILIO_AUTH_TOKEN: "${{ secrets[env.TWILIO_AUTH_TOKEN_SECRET_NAME] }}"
+
+      - name: "Prepare Flex Admin release details"
+        id: "release"
+        shell: "python"
+        run: |
+          import os
+          import re
+          import sys
+
+          DEPLOY_OUTPUT = """${{ steps.deploy.outputs.deploy-output }}"""
+          RELEASE_RE = re.compile(
+            r'twilio flex\:plugins\:release --plugin (?P<plugin_name>[^\s]+)'
+            r' --name \"(?P<release_name>[^\"]+)\"'
+            r' --description \"(?P<plugin_description>[^\"]+)\"'
+          )
+
+          if found := RELEASE_RE.findall(DEPLOY_OUTPUT):
+            print("Deploy Output has been succesfully parsed...")
+            plugin_name, release_name, plugin_description = found[0]
+
+            print(f"Plugin Name: {plugin_name}")
+            print(f"Plugin Description: {plugin_description}")
+            print(f"Release Name: {release_name}")
+
+            with open(os.environ["GITHUB_OUTPUT"], "a+") as github_output_handler:
+              print(f"plugin-name={plugin_name}", file=github_output_handler)
+              print(f"release-name={release_name}", file=github_output_handler)
+              print(f"plugin-description={plugin_description}", file=github_output_handler)
+
+            raise SystemExit(0)
+
+          print("ERROR: Unable to match twilio flex:plugins:release command in Deploy Output", file=sys.stderr)
+          print("Deploy Output:\n\n", DEPLOY_OUTPUT)
+
+          raise SystemExit(1)
+
+      - name: "Release Flex Admin plugin"
+        run: |
+          twilio flex:plugins:release \
+            --plugin "${{ steps.release.outputs.plugin-name }}" \
+            --name "${{ steps.release.outputs.release-name }}" \
+            --description "${{ steps.release.outputs.plugin-description }}"
+        working-directory: "${{ env.FLEX_ADMIN_DIR }}"
+        env:
+          TWILIO_ACCOUNT_SID: "${{ secrets[env.TWILIO_ACCOUNT_SID_SECRET_NAME] }}"
+          TWILIO_AUTH_TOKEN: "${{ secrets[env.TWILIO_AUTH_TOKEN_SECRET_NAME] }}"

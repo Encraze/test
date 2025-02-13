@@ -1,0 +1,28 @@
+name: "Setup public ECR"
+description: "Log into public ECR registry to avoid pulling images issues."
+
+inputs:
+  aws-access-key-id:
+    description: "AWS_ACCESS_KEY_ID for login to public ECR"
+    required: true
+  aws-secret-access-key:
+    description: "AWS_SECRET_ACCESS_KEY for login to public ECR"
+    required: true
+  aws-region:
+    description: "AWS region of public ECR"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Configure AWS credentials for ECR"
+      uses: "aws-actions/configure-aws-credentials@v4.0.2"
+      with:
+        aws-access-key-id: "${{ inputs.aws-access-key-id }}"
+        aws-secret-access-key: "${{ inputs.aws-secret-access-key }}"
+        aws-region: "${{ inputs.aws-region }}"
+
+    - name: "Login to Amazon ECR Public"
+      uses: "aws-actions/amazon-ecr-login@v2.0.1"
+      with:
+        registry-type: "public"

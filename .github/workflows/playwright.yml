@@ -1,0 +1,69 @@
+name: Playwright E2E Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      stack_name:
+        description: "Stack name to test"
+        required: true
+        type: string
+
+jobs:
+  playwright-tests:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+
+      - name: Run Playwright Tests
+        run: |
+          case "${{ inputs.stack_name }}" in
+            neurality-demo)
+              export BASEURL="https://areti-chat.aretihealth.com" && npx playwright test
+              ;;
+            neurality-ima-staging)
+              export BASEURL="https://chat-ima-staging.aretihealth.com/abq.html" && npx playwright test &&
+              export BASEURL="https://chat-ima-staging.aretihealth.com/phoenix.html" && npx playwright test
+              ;;
+            neurality-qcr-staging)
+              export BASEURL="https://chat-qcr-staging.aretihealth.com/austin.html" && npx playwright test &&
+              export BASEURL="https://chat-qcr-staging.aretihealth.com/omaha.html" && npx playwright test
+              ;;
+            neurality-alsa-staging)
+              export BASEURL="https://chat-alsa-staging.aretihealth.com/weight.html" && npx playwright test &&
+              export BASEURL="https://chat-alsa-staging.aretihealth.com/moderna.html" && npx playwright test
+              ;;
+            neurality-tekton-staging)
+              export BASEURL="https://chat-tekton-staging.aretihealth.com" && npx playwright test
+              ;;
+            neurality-spaulding-staging)
+              export BASEURL="https://chat-spaulding-staging.aretihealth.com" && npx playwright test
+              ;;
+            neurality-gadolin-staging)
+              export BASEURL="https://chat-gadolin-staging.aretihealth.com" && npx playwright test
+              ;;
+            neurality-chesapeake-staging)
+              export BASEURL="https://chat-chesapeake-staging.aretihealth.com" && npx playwright test
+              ;;
+            *)
+          esac
+
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 3

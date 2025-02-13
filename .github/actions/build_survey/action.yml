@@ -1,0 +1,17 @@
+name: "Build survey bundle"
+description: "Setup cache and build survey bundle."
+
+runs:
+  using: "composite"
+
+  steps:
+    - name: "Cache survey application"
+      uses: "actions/cache@v4.2.0"
+      with:
+        path: "survey/build/"
+        key: "survey-bundle-${{ hashFiles('survey/package-lock.json', 'survey/public/**/*', 'survey/src/**/*') }}"
+
+    - name: "Build survey application"
+      shell: "bash"
+      run: "npm run build"
+      working-directory: "survey/"

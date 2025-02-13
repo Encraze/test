@@ -1,0 +1,62 @@
+name: "Conventions Validation"
+
+on:
+  pull_request:
+    types: ["opened", "synchronize", "reopened", "edited"]
+  push:
+    branches: ["*"]
+
+jobs:
+  validate:
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@v4"
+
+      - name: "Check branch name"
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BRANCH_NAME="${{ github.head_ref }}"
+          else
+            BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          fi
+
+          if [[ $BRANCH_NAME == "main" ]]; then
+            echo "Main branch detected"
+            exit 0
+          fi
+
+          PATTERN="^((feat|feature|refactor|fix|chore|docs|test)/[0-9]+/[a-zA-Z0-9-_]+|(dependabot|build)/[a-zA-Z0-9/_-]+)$"
+
+          if ! [[ $BRANCH_NAME =~ $PATTERN ]]; then
+            echo "Error: Branch name '$BRANCH_NAME' does not follow the required convention"
+            echo ""
+            echo "Required format: <type>/<issue-number>/<brief-description>"
+            echo "Where <type> must be one of: feat, feature, refactor, fix, chore, docs, test"
+            echo ""
+            echo "Examples:"
+            echo "✓ feature/123/add-login-page"
+            echo "✓ fix/456/broken-auth-flow"
+            echo "✓ chore/789/update-dependencies"
+            echo "✓ docs/234/update-api-docs"
+            exit 1
+          fi
+
+      - name: "Check PR title"
+        if: github.event_name == 'pull_request'
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PATTERN="^(feat|feature|refactor|fix|chore|chore\(deps\)|chore\(deps-dev\)|build\(deps\)|docs|test): .+$"
+
+          if ! [[ $PR_TITLE =~ $PATTERN ]]; then
+            echo "Error: PR title '$PR_TITLE' does not follow the required format"
+            echo ""
+            echo "Required format: <type>: <description>"
+            echo "Where <type> must be one of: feat, feature, fix, chore, docs"
+            echo ""
+            echo "Examples:"
+            echo "✓ feat: add login page"
+            echo "✓ fix(auth): repair broken authentication flow"
+            echo "✓ chore: update dependencies"
+            echo "✓ docs(api): update API documentation"
+            exit 1
+          fi

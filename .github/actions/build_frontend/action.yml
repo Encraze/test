@@ -1,0 +1,33 @@
+name: "Build frontend bundle"
+description: "Setup cache and build frontend bundle."
+
+inputs:
+  builder:
+    description: "Builder to use: npm / yarn"
+    required: true
+    default: "npm"
+
+  cache-suffix:
+    description: "Additional suffix for the cached build"
+    required: false
+    default: ""
+
+  working-directory:
+    description: "Working directory with the source"
+    required: true
+
+runs:
+  using: "composite"
+
+  steps:
+    - name: "Cache frontend bundle"
+      uses: "actions/cache@v4.2.0"
+      with:
+        path: |
+          ${{ inputs.working-directory }}build/
+        key: "bundle-${{ inputs.working-directory }}-${{ hashFiles(format('{0}package-lock.json', inputs.working-directory), format('{0}yarn.lock', inputs.working-directory), format('{0}public/', inputs.working-directory), format('{0}src/', inputs.working-directory))}}${{ inputs.cache-suffix }}"
+
+    - name: "Build frontend bundle"
+      shell: "bash"
+      run: "${{ inputs.builder }} run build"
+      working-directory: "${{ inputs.working-directory }}"

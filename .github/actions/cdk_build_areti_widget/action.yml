@@ -1,0 +1,51 @@
+name: "Prepare Areti Widget bundle fro CDK deploy."
+description: "Build Areti Widget bundle before aretihealth or aretihealth-staging stack deploy, or do nothing for any other stack."
+
+inputs:
+  stack-name:
+    description: "Stack name for Areti Widget build"
+    required: true
+
+runs:
+  using: "composite"
+
+  steps:
+    - name: "Install Areti Widget"
+      if: "${{ startsWith(inputs.stack-name, 'aretihealth') && inputs.stack-name != 'aretihealth-core' }}"
+      uses: "./.github/actions/install_frontend/"
+      with:
+        installer: "npx yarn"
+        working-directory: "areti-widget/"
+
+    - name: "Copy sample DotENV file"
+      if: "${{ startsWith(inputs.stack-name, 'aretihealth') && inputs.stack-name != 'aretihealth-core' }}"
+      shell: "bash"
+      run: "cp -v .env.sample .env"
+      working-directory: "areti-widget/"
+
+    - name: "Build Areti Widget"
+      if: "${{ startsWith(inputs.stack-name, 'aretihealth') && inputs.stack-name != 'aretihealth-core' }}"
+      uses: "./.github/actions/build_frontend/"
+      with:
+        builder: "npx yarn"
+        working-directory: "areti-widget/"
+      # TODO: Fix ESLint warnings in Areti Widget :pray:
+      env:
+        CI: "false"
+
+    - name: "Move bundle to webchat-script directory"
+      if: "${{ startsWith(inputs.stack-name, 'aretihealth') && inputs.stack-name != 'aretihealth-core' }}"
+      shell: "bash"
+      run: |
+        set -euo pipefail
+
+        deploy_dir="../twilio/webchat-script"
+        mkdir -p "${deploy_dir}"
+
+        echo "Copying bundle from build directory to ${deploy_dir}..."
+        cp -v build/static/js/main.js "${deploy_dir}/areti-widget.js"
+        cp -vr build/assets "${deploy_dir}"
+
+        echo "Listing ${deploy_dir}..."
+        ls -lR "${deploy_dir}"
+      working-directory: "areti-widget/"

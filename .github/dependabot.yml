@@ -1,0 +1,87 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      time: "03:00"
+    open-pull-requests-limit: 25
+    labels:
+      - "backend"
+      - "build"
+      - "dependencies"
+    groups:
+      backend-root-dependencies:
+        dependency-type: "production"
+      backend-dependencies:
+        dependency-type: "development"
+    ignore:
+      - dependency-name: "aws-cdk-lib"
+      - dependency-name: "boto3"
+      - dependency-name: "boto3-stubs"
+      - dependency-name: "botocore-stubs"
+      - dependency-name: "mypy-boto3-cloudwatch"
+      - dependency-name: "mypy-boto3-dynamodb"
+      - dependency-name: "mypy-boto3-lambda"
+      - dependency-name: "mypy-boto3-s3"
+      - dependency-name: "mypy-boto3-scheduler"
+      - dependency-name: "mypy-boto3-ses"
+      - dependency-name: "mypy-boto3-ssm"
+      - dependency-name: "aws-lambda-powertools"
+
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      time: "04:00"
+    open-pull-requests-limit: 25
+    labels:
+      - "build"
+      - "dependencies"
+      - "frontend"
+    groups:
+      cypress-dependencies:
+        patterns: ["*"]
+
+  - package-ecosystem: "npm"
+    directory: "/areti-widget/"
+    schedule:
+      interval: "monthly"
+      time: "04:00"
+    open-pull-requests-limit: 25
+    labels:
+      - "build"
+      - "dependencies"
+      - "frontend"
+    groups:
+      areti-widget-dependencies:
+        patterns: ["*"]
+
+  - package-ecosystem: "npm"
+    directory: "/survey/"
+    schedule:
+      interval: "monthly"
+      time: "04:00"
+    open-pull-requests-limit: 25
+    labels:
+      - "build"
+      - "dependencies"
+      - "frontend"
+    groups:
+      survey-dependencies:
+        patterns: ["*"]
+
+  - package-ecosystem: "github-actions"
+    directories:
+      - "**/*"
+    schedule:
+      interval: "monthly"
+      time: "05:00"
+    open-pull-requests-limit: 10
+    labels:
+      - "build"
+      - "ci"
+      - "dependencies"
+    groups:
+      ci-dependencies:
+        patterns: ["*"]

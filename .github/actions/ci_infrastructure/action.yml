@@ -1,0 +1,13 @@
+name: "CI Infrastructure"
+description: "Run CI steps for infrastructure."
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Run infrastructure tests"
+      run: |
+        set -euo pipefail
+        ./dotenv.sh poetry run python3 -m pytest --no-cov infrastructure/
+      env:
+        STAGE: "test"
+      shell: bash

@@ -1,0 +1,32 @@
+name: Run Report Check Daily
+
+on:
+  schedule:
+    - cron: "0 14 * * *"
+  workflow_dispatch:
+
+jobs:
+  run-script:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install dotenv dependency
+        run: pip install python-dotenv
+
+      - name: Run Python script
+        run: python neurality/tests/reports/fetch_latest_reports.py
+
+      - name: Upload attachments as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fetched-reports
+          path: tests/reports/attachments/
+          retention-days: 3

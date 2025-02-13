@@ -1,0 +1,200 @@
+defaults:
+  run:
+    shell: "bash"
+
+name: "Deploy infrastructure and backend"
+run-name: "Deploy infrastructure and backend: ${{ inputs.stack_name }}, dry run: ${{ inputs.dry_run }}"
+
+on:
+  workflow_call:
+    inputs:
+      dry_run:
+        description: "Only show cdk diff output, without running deploy"
+        required: false
+        default: false
+        type: "boolean"
+
+      stack_name:
+        description: "Stack name to deploy"
+        required: true
+        type: "string"
+
+    secrets:
+      CDK_AWS_ACCESS_KEY_ID:
+        required: true
+
+      CDK_AWS_SECRET_ACCESS_KEY:
+        required: true
+
+      CDK_AWS_ROLE_TO_ASSUME:
+        required: true
+
+      ECR_AWS_ACCESS_KEY_ID:
+        required: true
+
+      ECR_AWS_SECRET_ACCESS_KEY:
+        required: true
+
+      STAGING_OPENAI_API_KEY:
+        required: true
+
+      STAGING_TWILIO_ACCOUNT_SID:
+        required: true
+
+      STAGING_TWILIO_AUTH_TOKEN:
+        required: true
+
+  workflow_dispatch:
+    inputs:
+      stack_name:
+        description: "Stack name to deploy"
+        required: true
+        type: "choice"
+        options:
+          # Manually added stacks
+          #
+          # All Neurality Staging
+          - "neurality*-staging"
+          # Neurality Demo
+          - "neurality-demo"
+          # paradigm demo seems to be also called aidemo, and Ilya says it's used by him
+          - "neurality-paradigm-demo"
+          # Areti Health core resources (Grafana, etc.)
+          - "aretihealth-core"
+          # Areti Health (website & CDN)
+          - "aretihealth"
+          - "aretihealth-staging"
+          # Survey (website)
+          - "survey"
+          - "survey-staging"
+
+          # DO NOT REMOVE: stacks added by Infrastructure Automation scripts
+          - "neurality-alcanza-prod"
+          - "neurality-alcanza-staging"
+          - "neurality-alsa-prod"
+          - "neurality-alsa-staging"
+          - "neurality-areti-prod"
+          - "neurality-catalina-prod"
+          - "neurality-catalina-staging"
+          - "neurality-chesapeake-prod"
+          - "neurality-chesapeake-staging"
+          - "neurality-clinical-enrollment-prod"
+          - "neurality-clinical-enrollment-staging"
+          - "neurality-elite-prod"
+          - "neurality-elite-staging"
+          - "neurality-flourish-prod"
+          - "neurality-flourish-staging"
+          - "neurality-gadolin-prod"
+          - "neurality-gadolin-staging"
+          - "neurality-helios-prod"
+          - "neurality-helios-staging"
+          - "neurality-ima-prod"
+          - "neurality-ima-staging"
+          - "neurality-paradigm-v2-prod"
+          - "neurality-paradigm-v2-staging"
+          - "neurality-paratus-prod"
+          - "neurality-paratus-staging"
+          - "neurality-profound-prod"
+          - "neurality-profound-staging"
+          - "neurality-qcr-prod"
+          - "neurality-qcr-staging"
+          - "neurality-seattle-prod"
+          - "neurality-seattle-staging"
+          - "neurality-spaulding-prod"
+          - "neurality-spaulding-staging"
+          - "neurality-tekton-prod"
+          - "neurality-tekton-staging"
+        default: "neurality-paradigm-demo"
+
+      dry_run:
+        description: "Only show cdk diff output, without running deploy"
+        type: "boolean"
+        default: false
+
+      skip_tests:
+        description: "Do not run any test suite, trigger deployment immediately"
+        type: "boolean"
+        default: false
+
+# Do not run multiple cdk deploys in parallel
+concurrency:
+  group: "${{ github.workflow }}-${{ inputs.stack_name }}-${{ inputs.dry_run }}"
+  cancel-in-progress: true
+
+env:
+  # Python vars
+  PYTHONUNBUFFERED: "1"
+  # Deploy env
+  AWS_DEFAULT_REGION: "us-east-1"
+  ECR_AWS_REGION: "us-east-1"
+  # Frontend env
+  REACT_APP_AUTHORIZATION_HEADER: "X-Authorization"
+  # Twilio env
+  TWILIO_VOICEAI_DIR: "twilio/voiceai-v2/"
+
+jobs:
+  functional-tests:
+    name: "Functional tests"
+
+    runs-on: "ubuntu-22.04"
+    env:
+      ALWAYS_SKIP: "aretihealth,aretihealth-staging,aretihealth-core,survey,survey-staging"
+
+    steps:
+      - uses: "actions/checkout@v4.1.7"
+        if: "!inputs.skip_tests && !contains(env.ALWAYS_SKIP, inputs.stack_name)"
+
+      - id: "install"
+        if: "!inputs.skip_tests && !contains(env.ALWAYS_SKIP, inputs.stack_name)"
+        uses: "./.github/actions/install_backend/"
+
+      - name: "Run Functional Tests"
+        if: "!inputs.skip_tests && !contains(env.ALWAYS_SKIP, inputs.stack_name)"
+        uses: "./.github/actions/cdk_infra_test/"
+        with:
+          stack_name: "${{ inputs.stack_name }}"
+          skip_tests: "${{ inputs.skip_tests }}"
+          always_skip: "${{ env.ALWAYS_SKIP }}"
+        env:
+          CI_AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
+          CI_AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
+
+  cdk_deploy:
+    name: "Deploy infrastructure and backend: ${{ inputs.stack_name }}, dry run: ${{ inputs.dry_run }}"
+    needs: ["functional-tests"]
+
+    runs-on: "ubuntu-22.04"
+    timeout-minutes: 180 # 30 minutes
+
+    steps:
+      - uses: "actions/checkout@v4.1.7"
+
+      - name: "Deploy Infrastructure and Backend"
+        uses: "./.github/actions/cdk_infra_deploy/"
+        with:
+          stack_name: "${{ inputs.stack_name }}"
+          dry_run: "${{ inputs.dry_run }}"
+        env:
+          CI_AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
+          CI_AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
+
+  playwright-tests:
+    name: "Playwright Tests"
+    needs: ["cdk_deploy"]
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Trigger Playwright Workflow
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const response = await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'playwright.yml',
+              ref: context.ref,
+              inputs: {
+                stack_name: "${{ inputs.stack_name }}",
+              },
+            });
+            console.log('Triggered Playwright Tests Workflow:', response.status);

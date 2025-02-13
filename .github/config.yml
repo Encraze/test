@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: New Customer Deployment
+    url: https://github.com/aretihealth/issues/new?template=new_customer_deployment.md
+    about: Create a new customer/site/study deployment.

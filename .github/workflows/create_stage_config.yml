@@ -1,0 +1,262 @@
+# Step 1 to deploy new stage by creating its CDK config
+
+defaults:
+  run:
+    shell: "bash"
+
+name: "[DEPRECATED] Create Stage config"
+run-name: "Create Stage config: ${{ inputs.customer }}-${{ inputs.stage }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      customer:
+        description: "Customer (e.g. spaulding | ima | tekton)"
+        required: true
+        type: "string"
+
+      stage:
+        description: "Stage (e.g. staging | demo | prod)"
+        required: true
+        type: "string"
+
+      twilio_account_label:
+        description: "Twilio Account Label"
+        default: ""
+        type: "string"
+
+      twilio_account_sid:
+        description: "Twilio Account SID"
+        required: true
+        type: "string"
+
+      flex_widget_subdomain_name:
+        description: "Custom subdomain name for Flex Widget"
+        default: ""
+        type: "string"
+
+      extra_email_identities:
+        description: "Extra email identities to send email from (separate by space)"
+        default: ""
+        type: "string"
+
+      cors_allow_origins:
+        description: "CORS allow origins (separate by space)"
+        default: ""
+        type: "string"
+
+      customer_extra_environment:
+        description: "Global extra environment (separate KEY=value by space)"
+        default: ""
+        type: "string"
+
+      langchain_project:
+        description: "LangChain project name (leave empty for default one)"
+        default: ""
+        type: "string"
+
+      stage_extra_environment:
+        description: "Extra environment (separate KEY=value by space)"
+        default: ""
+        type: "string"
+
+env:
+  # Python vars
+  
+  # This commented line should be removed, you can do it.
+  # BLACK_VERSION: "24.4.2"
+
+  PYTHONUNBUFFERED: "1"
+  # Automation vars
+  BASE_STACK: "neurality"
+  FLEX_WIDGET_FAVICON_LINK_SOURCE: "../../../frontend-archive/public/favicon-aidemo.ico"
+  FLEX_WIDGET_FAVICON_LINK_NAME: "favicon.ico"
+  FLEX_WIDGET_LOGO_LINK_SOURCE: "../../../frontend-archive/src/assets/logo-aidemo.png"
+  FLEX_WIDGET_LOGO_LINK_NAME: "logo.png"
+
+jobs:
+  create_stage_config:
+    name: "Create Stage config: ${{ inputs.customer }}-${{ inputs.stage }}"
+
+    runs-on: "ubuntu-22.04"
+
+    steps:
+      - uses: "actions/checkout@v4.1.7"
+
+      - id: "config"
+        name: "Configure the job"
+        run: |
+          set -euo pipefail
+
+          stage_name="${{ inputs.customer }}-${{ inputs.stage }}"
+
+          echo "stage_name=${stage_name}" >> "${GITHUB_OUTPUT}"
+          echo "stack_name=${{ env.BASE_STACK }}-${stage_name}" >> "${GITHUB_OUTPUT}"
+
+      - id: "install"
+        uses: "./.github/actions/install_backend/"
+        with:
+          cache-key-suffix: "-infrastructure-test"
+          poetry-install-args: "--only=infrastructure,test"
+
+      - name: "Create customer config (if necessary)"
+        run: |
+          set -euo pipefail
+
+          if [ -f "infrastructure/configs/${{ env.BASE_STACK }}/${{ inputs.customer }}.yml" ]; then
+            echo "::notice::Customer config for ${{ inputs.customer }} already exists. Do nothing..."
+          else
+            poetry run python3 infrastructure/automation/scripts/create_customer_config.py \
+              --extra-email-identities="${{ inputs.extra_email_identities }}" \
+              --cors-allow-origins="${{ inputs.cors_allow_origins }}" \
+              --extra-environment="${{ inputs.customer_extra_environment }}" \
+              "${{ inputs.customer }}"
+          fi
+
+      - name: "Create stage config"
+        run: |
+          set -euo pipefail
+
+          poetry run python3 infrastructure/automation/scripts/create_stage_config.py \
+            --twilio-account-label="${{ inputs.twilio_account_label }}" \
+            --twilio-account-sid="${{ inputs.twilio_account_sid }}" \
+            --flex-widget-subdomain-name="${{ inputs.flex_widget_subdomain_name }}" \
+            --langchain-project="${{ inputs.langchain_project }}" \
+            --extra-environment="${{ inputs.stage_extra_environment }}" \
+            "${{ steps.config.outputs.stage_name }}"
+
+      - name: "Create stage test"
+        run: |
+          set -euo pipefail
+
+          poetry run python3 infrastructure/automation/scripts/create_stage_test.py \
+            --langchain-project="${{ inputs.langchain_project }}" \
+            --extra-email-identities="${{ inputs.extra_email_identities }}" \
+            "${{ steps.config.outputs.stage_name }}"
+
+      - name: "Add new stage to test_app"
+        run: |
+          set -euo pipefail
+
+          poetry run python3 infrastructure/automation/scripts/add_line.py \
+            -A "        # DO NOT REMOVE: stacks added by Infrastructure Automation scripts" \
+            -n '        "${{ steps.config.outputs.stack_name }}",' \
+            infrastructure/tests/functional/test_app.py
+
+      # This commented block should be removed, you can do it.
+      # - name: "Auto format tests"
+      #   run: 'pipx run --python="${{ steps.install.outputs.python-path }}" black==${{ env.BLACK_VERSION }} infrastructure/tests/functional/'
+
+      - name: "Add new stage to cdk_deploy"
+        run: |
+          set -euo pipefail
+
+          poetry run python3 infrastructure/automation/scripts/add_line.py \
+            -A "          # DO NOT REMOVE: stacks added by Infrastructure Automation scripts" \
+            -n '          - "${{ steps.config.outputs.stack_name }}"' \
+            .github/workflows/cdk_deploy.yml
+
+      - name: "Add new stage to twilio_config"
+        run: |
+          set -euo pipefail
+
+          poetry run python3 infrastructure/automation/scripts/add_line.py \
+            -A "          # DO NOT REMOVE: stacks added by Infrastructure Automation scripts" \
+            -n '          - "${{ steps.config.outputs.stack_name }}"' \
+            .github/workflows/twilio_config.yml
+
+      - id: "check_flex_widget"
+        name: "Check Flex Widget dir existence"
+        run: |
+          set -euo pipefail
+
+          flex_widget_dir="twilio/flex-widgets/${{ steps.config.outputs.stack_name }}"
+          
+          if [ -d "${flex_widget_dir}" ]; then
+            echo "exists=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "exists=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - id: "flex_widget"
+        name: "Create Flex Widget dir"
+        if: steps.check_flex_widget.outputs.exists == 'false'
+        run: |
+          set -euo pipefail
+
+          flex_widget_dir="twilio/flex-widgets/${{ steps.config.outputs.stack_name }}"
+
+          mkdir -p "${flex_widget_dir}"
+
+          ln -sv "${{ env.FLEX_WIDGET_FAVICON_LINK_SOURCE }}" "${flex_widget_dir}/${{ env.FLEX_WIDGET_FAVICON_LINK_NAME }}"
+          ln -sv "${{ env.FLEX_WIDGET_LOGO_LINK_SOURCE }}" "${flex_widget_dir}/${{ env.FLEX_WIDGET_LOGO_LINK_NAME }}"
+
+          flex_widget_url="$(head -n 1 infrastructure/configs/${{ env.BASE_STACK }}/stages/${{ steps.config.outputs.stage_name }}.yml | awk -F ': ' '{print $2}')"
+
+          echo "dir=${flex_widget_dir}" >> "${GITHUB_OUTPUT}"
+          echo "url=${flex_widget_url}" >> "${GITHUB_OUTPUT}"
+
+      - name: "Render Flex Widget"
+        if: steps.check_flex_widget.outputs.exists == 'false'
+        run: |
+          set -euo pipefail
+
+          poetry run python3 infrastructure/automation/scripts/render_template.py \
+            -c "customer=${{ inputs.customer }}" \
+            -c "twilio_account_sid=${{ inputs.twilio_account_sid }}" \
+            -c "widget_url=${{ steps.flex_widget.outputs.url }}" \
+            -T twilio/flex-widgets/${{ env.BASE_STACK }}-template/index.html.j2 \
+            "${{ steps.flex_widget.outputs.dir }}/index.html"
+
+      - name: "Render Flex Widget README"
+        if: steps.check_flex_widget.outputs.exists == 'false'
+        run: |
+          set -euo pipefail
+
+          poetry run python3 infrastructure/automation/scripts/render_template.py \
+            -c "stack_name=${{ steps.config.outputs.stack_name }}" \
+            -c "widget_url=${{ steps.flex_widget.outputs.url }}" \
+            -T twilio/flex-widgets/${{ env.BASE_STACK }}-template/README.md.j2 \
+            "${{ steps.flex_widget.outputs.dir }}/README.md"
+
+      - name: "Add new widget URL to README"
+        run: |
+          set -euo pipefail
+
+          poetry run python3 infrastructure/automation/scripts/add_line.py \
+            -A "<!-- DO NOT REMOVE -->" \
+            -n '| `${{ steps.config.outputs.stack_name }}` | ${{ steps.flex_widget.outputs.url }} |' \
+            twilio/flex-widgets/README.md
+
+      - id: "token"
+        uses: "tibdex/github-app-token@v2.1.0"
+        with:
+          app_id: "${{ secrets.BADABUMP_APP_ID }}"
+          private_key: "${{ secrets.BADABUMP_APP_PRIVATE_KEY }}"
+
+      - id: "pr"
+        name: "Create pull request with changed files"
+        uses: "peter-evans/create-pull-request@v6.1.0"
+        with:
+          token: "${{ steps.token.outputs.token }}"
+          commit-message: |
+            feat(infrastructure): Define ${{ steps.config.outputs.stage_name }} stage config
+
+            - Stack name: ${{ steps.config.outputs.stack_name }}
+            - Flex Widget: ${{ steps.flex_widget.outputs.url }}
+          branch: "feat/create-${{ steps.config.outputs.stage_name }}"
+          delete-branch: true
+          title: |
+            feat(infrastructure): Define ${{ steps.config.outputs.stage_name }} stage config
+          body: |
+            Stack name: **`${{ steps.config.outputs.stack_name }}`**
+
+            Flex Widget will be available at ${{ steps.flex_widget.outputs.url }}.
+          labels: "feat,infrastructure"
+          assignees: "${{ github.actor }}"
+
+      - name: "Output PR URL"
+        run: |
+          set -euo pipefail
+
+          echo "PR has been ${{ steps.pr.outputs.pull-request-operation }}: ${{ steps.pr.outputs.pull-request-url }}" >> "${GITHUB_STEP_SUMMARY}"

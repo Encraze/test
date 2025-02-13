@@ -1,0 +1,41 @@
+name: "CI Backend"
+description: "Run backend CI steps including tests, mypy, and pre-commit."
+
+inputs:
+  aws-access-key-id:
+    description: "AWS Access Key ID"
+    required: true
+    type: string
+  aws-secret-access-key:
+    description: "AWS Secret Access Key"
+    required: true
+    type: string
+
+runs:
+  using: "composite"
+  steps:       
+    - uses: "./.github/actions/make_dotenv_local/"
+      with:
+        aws-access-key-id: "${{ inputs.aws-access-key-id }}"
+        aws-secret-access-key: "${{ inputs.aws-secret-access-key }}"
+
+    - name: "Check that neurality app (API Gateway) lambda handler is importable"
+      run: |
+        ./dotenv.sh poetry run python3 \
+          -c "from neurality_app import lambda_app; print(lambda_app.handler)"
+      shell: bash                                  
+
+    - name: "Check that Demo API (Lambda Function URL) lambda handler is importable"
+      run: |
+        ./dotenv.sh poetry run python3 \
+          -c "from demo_api import lambda_app; print(lambda_app.handler)"  
+      shell: bash                                  
+
+    - name: "Run tests"
+      run: "./dotenv.sh poetry run python3 -m pytest"
+      env:
+        AWS_ACCESS_KEY_ID: "${{ inputs.aws-access-key-id }}"
+        AWS_SECRET_ACCESS_KEY: "${{ inputs.aws-secret-access-key }}"
+        STAGE: "test"
+      shell: bash                        
+

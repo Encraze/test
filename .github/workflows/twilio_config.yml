@@ -1,0 +1,136 @@
+defaults:
+  run:
+    shell: "bash"
+
+name: "Twilio Configuration"
+run-name: "Configure Twilio Account SID ${{ inputs.account_sid }} for ${{ inputs.stack_name }} stack"
+
+on:
+  workflow_dispatch:
+    inputs:
+      stack_name:
+        description: "Stack name to configure Twilio in"
+        required: true
+        type: "choice"
+        options:
+          # Manually added stacks
+          #
+          # Staging
+          - "neurality-paratus-staging"
+          - "neurality-spaulding-staging"
+          - "neurality-tekton-staging"
+          - "neurality-alcanza-staging"
+          # Demo
+          - "neurality-paradigm-demo"
+          - "neurality-demo"
+          # Prod
+          - "neurality-paratus-prod"
+          - "neurality-spaulding-prod"
+          - "neurality-tekton-prod"
+          - "neurality-areti-prod"
+          - "neurality-alcanza-prod"
+          # DO NOT REMOVE: stacks added by Infrastructure Automation scripts
+          - "neurality-clinical-enrollment-prod"
+          - "neurality-clinical-enrollment-staging"
+          - "neurality-flourish-prod"
+          - "neurality-flourish-staging"
+          - "neurality-seattle-prod"
+          - "neurality-seattle-staging"
+          - "neurality-catalina-prod"
+          - "neurality-catalina-staging"
+          - "neurality-elite-prod"
+          - "neurality-elite-staging"
+          - "neurality-chesapeake-prod"
+          - "neurality-chesapeake-staging"
+          - "neurality-gadolin-prod"
+          - "neurality-gadolin-staging"
+          - "neurality-qcr-prod"
+          - "neurality-qcr-staging"
+          - "neurality-ima-prod"
+          - "neurality-ima-staging"
+          - "neurality-paradigm-v2-prod"
+          - "neurality-paradigm-v2-staging"
+          - "neurality-profound-prod"
+          - "neurality-profound-staging"
+          - "neurality-alsa-prod"
+          - "neurality-alsa-staging"
+          - "neurality-helios-prod"
+          - "neurality-helios-staging"
+
+      account_sid:
+        description: "Account SID"
+        required: true
+        type: "string"
+
+      api_key:
+        description: "API Key"
+        required: true
+        type: "string"
+
+      api_secret:
+        description: "API Secret"
+        required: true
+        type: "string"
+
+      default_phone_number:
+        description: "Default Phone Number"
+        required: true
+        type: "string"
+
+      default_author_name:
+        description: "Default Author Name"
+        required: true
+        type: "string"
+
+# Do not run multiple Twilio Configurations for same stack in parallel
+concurrency:
+  group: "${{ github.workflow }}-${{ inputs.stack_name }}"
+  cancel-in-progress: true
+
+env:
+  AWS_DEFAULT_REGION: "us-east-1"
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  twilio_config:
+    name: "Configure Twilio Account SID ${{ inputs.account_sid }} for ${{ inputs.stack_name }} stack"
+
+    runs-on: "ubuntu-22.04"
+
+    steps:
+      - uses: "actions/checkout@v4.1.7"
+
+      - name: "Setup AWS region"
+        run: |
+          set -euo pipefail
+
+          aws_region="${{ env.AWS_DEFAULT_REGION }}"
+          stack_name="${{ inputs.stack_name }}"
+
+          if [[ "${stack_name}" = "neurality-paratus-"* ]]; then
+            aws_region="ap-southeast-2"
+            echo "Changing AWS region for ${stack_name} to: ${aws_region}"
+          fi
+
+          echo "AWS_DEFAULT_REGION=${aws_region}" >> "${GITHUB_ENV}"
+
+      - name: "Configure AWS credentials"
+        uses: "aws-actions/configure-aws-credentials@v4.0.2"
+        with:
+          aws-access-key-id: "${{ secrets.CDK_AWS_ACCESS_KEY_ID }}"
+          aws-secret-access-key: "${{ secrets.CDK_AWS_SECRET_ACCESS_KEY }}"
+          aws-region: "${{ env.AWS_DEFAULT_REGION }}"
+          role-to-assume: "${{ secrets.CDK_AWS_ROLE_TO_ASSUME }}"
+          role-session-name: "boto3-from-ci-for-${{ github.sha }}"
+          role-duration-seconds: 3600
+          role-skip-session-tagging: true
+
+      - name: "Configure Twilio Account SID ${{ inputs.account_sid }} for ${{ inputs.stack_name }} stack"
+        uses: "./.github/actions/twilio_config/"
+        with:
+          stack-name: "${{ inputs.stack_name }}"
+          account-sid: "${{ inputs.account_sid }}"
+          api-key: "${{ inputs.api_key }}"
+          api-secret: "${{ inputs.api_secret }}"
+          default-phone-number: "${{ inputs.default_phone_number }}"
+          default-author-name: "${{ inputs.default_author_name }}"

@@ -1,0 +1,135 @@
+name: "Deploy Infrastructure and Backend"
+description: "Deploys infrastructure and backend for a specified stack using AWS CDK. Supports dry-run mode and conditional deployments."
+
+inputs:
+  stack_name:
+    description: "Name of the stack to deploy."
+    required: true
+    type: "string"
+
+  dry_run:
+    description: "Only show CDK diff output without running deployment."
+    required: false
+    default: false
+    type: "boolean"
+
+env:
+  PYTHONUNBUFFERED: "1"
+  REACT_APP_AUTHORIZATION_HEADER: "X-Authorization"
+  TWILIO_VOICEAI_DIR: "twilio/voiceai-v2/"
+
+runs:
+  using: "composite"
+  steps:
+    - id: "cdk-config"
+      name: "Setup CDK Options"
+      run: |
+        set -euo pipefail
+        concurrency="1"
+        if [ "${{ inputs.stack_name }}" = "neurality*-staging" ]; then
+          concurrency="8"
+        fi
+        echo "concurrency=${concurrency}" >> "${GITHUB_OUTPUT}"
+      shell: bash
+
+    - name: "Setup CDK Environment"
+      uses: "./.github/actions/setup_cdk/"
+      with:
+        # TODO: Do not use AWS access key for assuming CDK AWS role
+        cdk-aws-access-key-id: "${{ env.CI_AWS_ACCESS_KEY_ID }}"
+        cdk-aws-secret-access-key: "${{ env.CI_AWS_SECRET_ACCESS_KEY }}"        
+        cdk-aws-region: "us-east-1"        
+        cdk-role-to-assume: "${{ env.CDK_AWS_ROLE_TO_ASSUME }}"
+        cdk-role-duration-seconds: 7200
+        ecr-aws-access-key-id: "${{ env.CI_AWS_ACCESS_KEY_ID }}"
+        ecr-aws-secret-access-key: "${{ env.CI_AWS_SECRET_ACCESS_KEY }}"        
+        ecr-aws-region: "us-east-1"  
+
+    - name: "Build Areti Widget Stack"
+      uses: "./.github/actions/cdk_build_areti_widget/"
+      with:
+        stack-name: "${{ inputs.stack_name }}"
+
+    - uses: "./.github/actions/cdk_build_survey/"
+      with:
+        stack-name: "${{ inputs.stack_name }}"        
+
+    - name: "Prepare CDK Diff"
+      run: |
+        echo "CDK_ARGS=diff ${{ inputs.stack_name }}" >> "${GITHUB_ENV}"
+      shell: bash
+
+    - name: "Run CDK Diff"      
+      run: | 
+        set -euo pipefail
+        echo "Running CDK Diff with arguments: $CDK_ARGS"
+        cdk $CDK_ARGS 
+      shell: bash   
+               
+    - name: "Prepare CDK Deploy"            
+      if: ${{ inputs.dry_run != 'true' }}
+      run: |
+        echo "CDK_ARGS=deploy --ci --require-approval=never \
+        --concurrency=${{ steps.cdk-config.outputs.concurrency }} \
+        --asset-parallelism ${{ inputs.stack_name }}" >> "${GITHUB_ENV}"
+      shell: bash
+
+    - name: "Run CDK Deploy"      
+      if: ${{ inputs.dry_run != 'true' }}
+      run: | 
+        set -euo pipefail
+        echo "Running CDK Deploy with arguments: $CDK_ARGS"
+        cdk $CDK_ARGS 
+      shell: bash   
+         
+    - name: "Tag Production Deployment"      
+      if: ${{ inputs.dry_run != 'true' && endsWith(inputs.stack_name, '-prod') }}
+      run: |
+        deployment_name="${{ inputs.stack_name }}"
+        current_date=$(date +'%Y-%m-%d_%H%M')
+        tag_name="${deployment_name}-deploy-${current_date}_UTC"
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git tag "$tag_name"
+        git push origin "$tag_name"
+      shell: bash
+      env:
+        GITHUB_TOKEN: "${{ env.GITHUB_TOKEN }}"
+
+    - name: "Install Post-Deployment Requirements"
+      run: pip install -r scripts/post_deploy/requirements.txt
+      shell: bash
+
+    - name: "Run Post-Deployment Scripts"
+      run: |
+        for script in scripts/post_deploy/*.py; do
+          echo "Running $script"
+          python "$script" "${{ inputs.stack_name }}"
+        done
+      shell: bash
+
+    - name: "Install Twilio App"      
+      if: ${{ inputs.dry_run != 'true' && (inputs.stack_name == 'neurality*-staging' || inputs.stack_name == 'neurality-staging') }}
+      uses: "./.github/actions/install_frontend/"
+      with:
+        install-twilio-cli: "true"
+        install-twilio-serverless-plugin: "true"
+        working-directory: "${{ env.TWILIO_VOICEAI_DIR }}"
+
+    - name: "Setup .env for Twilio"      
+      if: ${{ inputs.dry_run != 'true' && (inputs.stack_name == 'neurality*-staging' || inputs.stack_name == 'neurality-staging') }}
+      run: |
+        echo "ACCOUNT_SID=${{ env.STAGING_TWILIO_ACCOUNT_SID }}" > .env
+        echo "AUTH_TOKEN=${{ env.STAGING_TWILIO_AUTH_TOKEN }}" >> .env
+        echo "OPENAI_API_KEY=${{ env.STAGING_OPENAI_API_KEY }}" >> .env
+      working-directory: "${{ env.TWILIO_VOICEAI_DIR }}"
+      shell: bash
+
+    - name: "Deploy Twilio Serverless"      
+      if: ${{ inputs.dry_run != 'true' && (inputs.stack_name == 'neurality*-staging' || inputs.stack_name == 'neurality-staging') }}
+      run: "twilio serverless:deploy --override-existing-project"
+      working-directory: "${{ env.TWILIO_VOICEAI_DIR }}"
+      shell: bash
+      env:
+        TWILIO_ACCOUNT_SID: "${{ env.STAGING_TWILIO_ACCOUNT_SID }}"
+        TWILIO_AUTH_TOKEN: "${{ env.STAGING_TWILIO_AUTH_TOKEN }}"
