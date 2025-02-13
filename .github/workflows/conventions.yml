@@ -26,7 +26,7 @@ jobs:
           fi
 
           PATTERN="^(feat|feature|refactor|fix|chore|docs|test)/[0-9]+/[a-zA-Z0-9-]+$"
-          PATTERN2="^(dependabot|build)/[a-zA-Z0-9_\-\/]+$"
+          PATTERN2="^(dependabot|build)/[a-zA-Z0-9/_-]+$"
 
           if ! [[ $BRANCH_NAME =~ $PATTERN ]] && ! [[ $BRANCH_NAME =~ $PATTERN2 ]]; then
             echo "Error: Branch name '$BRANCH_NAME' does not follow the required convention"
