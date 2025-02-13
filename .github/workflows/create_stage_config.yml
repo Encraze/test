@@ -236,7 +236,7 @@ jobs:
 
       - id: "pr"
         name: "Create pull request with changed files"
-        uses: "peter-evans/create-pull-request@v6.1.0"
+        uses: "peter-evans/create-pull-request@v7.0.6"
         with:
           token: "${{ steps.token.outputs.token }}"
           commit-message: |

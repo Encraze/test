@@ -185,7 +185,7 @@ jobs:
 
     steps:
       - name: Trigger Playwright Workflow
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           script: |
             const response = await github.rest.actions.createWorkflowDispatch({

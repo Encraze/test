@@ -47,12 +47,12 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - uses: "actions/setup-python@v5.2.0"
+    - uses: "actions/setup-python@v5.4.0"
       with:
         python-version-file: ".python-version"
 
     - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v3
+      uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ inputs.aws-access-key-id }}
         aws-secret-access-key: ${{ inputs.aws-secret-access-key }}

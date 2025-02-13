@@ -31,7 +31,7 @@ runs:
   using: "composite"
   steps:
     - name: "Install node.js"
-      uses: "actions/setup-node@v4.0.3"
+      uses: "actions/setup-node@v4.2.0"
       with:
         node-version-file: "${{ inputs.node-version-file }}"
         cache: "npm"

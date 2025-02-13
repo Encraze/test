@@ -41,7 +41,7 @@ runs:
   using: "composite"
   steps:
     - name: "Install node.js"
-      uses: "actions/setup-node@v4.0.3"
+      uses: "actions/setup-node@v4.2.0"
       with:
         node-version-file: ".node-version"
 
@@ -62,7 +62,7 @@ runs:
         aws-region: "${{ inputs.ecr-aws-region }}"
 
     - name: "Configure AWS credentials for CDK"
-      uses: "aws-actions/configure-aws-credentials@v4.0.2"
+      uses: "aws-actions/configure-aws-credentials@v4.1.0"
       with:
         aws-access-key-id: "${{ inputs.cdk-aws-access-key-id }}"
         aws-secret-access-key: "${{ inputs.cdk-aws-secret-access-key }}"

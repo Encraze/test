@@ -40,7 +40,7 @@ jobs:
           echo "continue-on-error=${continue_on_error}" >> "${GITHUB_OUTPUT}"
 
       - name: "Run Cypress Tests"
-        uses: "cypress-io/github-action@v6.7.5"
+        uses: "cypress-io/github-action@v6.7.10"
         continue-on-error: ${{ steps.setup-continue-on-error.outputs.continue-on-error == 'true' }}
         with:
           env: "TWILIO_ACCOUNT_SID=${{ secrets.twilio-account-sid }}"
