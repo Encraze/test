@@ -48,7 +48,8 @@ jobs:
           PR_TITLE="${{ github.event.pull_request.title }}"
           PATTERN="(?i)^(feat|feature|refactor|fix|chore|docs|test)(\([^)]*\))?: .+$"
 
-          if ! [[ $PR_TITLE =~ $PATTERN ]]; then
+          LOWERCASE=$(echo $PR_TITLE | tr '[:upper:]' '[:lower:]')
+          if ! [[ $LOWERCASE =~ $PATTERN ]]; then
             echo "Error: PR title '$PR_TITLE' does not follow the required format"
             echo ""
             echo "Required format: <type>: <description>"
